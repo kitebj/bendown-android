@@ -1,0 +1,15 @@
+// 应用初始化脚本
+apply from: 'init.gradle'
+
+// 项目配置
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// 构建任务
+task buildAll {
+    dependsOn tasks.findByName('assembleDebug') ?: 'build'
+}

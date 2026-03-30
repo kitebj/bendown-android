@@ -1,0 +1,36 @@
+/**
+ * 初始化脚本：禁用SSL验证（临时解决方案）
+ * 注意：这会降低安全性，仅用于测试环境
+ */
+
+import javax.net.ssl.*
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+
+// 创建一个信任所有证书的TrustManager
+def trustAllCerts = [
+    new X509TrustManager() {
+        X509Certificate[] getAcceptedIssuers() { return null }
+        void checkClientTrusted(X509Certificate[] certs, String authType) { }
+        void checkServerTrusted(X509Certificate[] certs, String authType) { }
+    } as X509TrustManager
+]
+
+// 创建SSLContext并初始化
+def sc = SSLContext.getInstance("SSL")
+sc.init(null, trustAllCerts, new SecureRandom())
+HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory())
+
+// 创建并设置HostnameVerifier
+def allHostsValid = new HostnameVerifier() {
+    boolean verify(String hostname, SSLSession session) {
+        return true
+    }
+}
+HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid)
+
+// 禁用证书撤销检查
+System.setProperty("com.sun.net.ssl.checkRevocation", "false")
+System.setProperty("https.protocols", "TLSv1.2")
+
+println "SSL验证已禁用（临时解决方案）"
