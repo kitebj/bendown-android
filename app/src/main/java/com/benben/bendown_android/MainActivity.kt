@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.view.WindowCompat
 import com.benben.bendown_android.data.RecentFilesManager
 import com.benben.bendown_android.data.model.MarkdownFile
 import com.benben.bendown_android.data.model.RecentFile
@@ -49,6 +50,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // 设置状态栏图标为深色（适合浅色背景）
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
+        
         documentResolver = SimpleDocumentResolver(this)
         recentFilesManager = RecentFilesManager(this)
 
@@ -64,6 +69,10 @@ class MainActivity : ComponentActivity() {
                     recentFiles = recentFiles,
                     onOpenFilePicker = { openFilePicker() },
                     onRecentFileClick = { recentFile -> openRecentFile(recentFile) },
+                    onClearHistory = {
+                        recentFilesManager.clear()
+                        loadRecentFiles()
+                    },
                     onScrollPositionChange = { uriString, position ->
                         recentFilesManager.updateScrollPosition(uriString, position)
                     },
@@ -223,6 +232,7 @@ fun MarkdownReaderApp(
     recentFiles: List<RecentFile>,
     onOpenFilePicker: () -> Unit,
     onRecentFileClick: (RecentFile) -> Unit,
+    onClearHistory: () -> Unit,
     onScrollPositionChange: (String, Int) -> Unit,
     onBack: () -> Unit
 ) {
@@ -232,7 +242,8 @@ fun MarkdownReaderApp(
         FileListScreen(
             onOpenFilePicker = onOpenFilePicker,
             recentFiles = recentFiles,
-            onRecentFileClick = onRecentFileClick
+            onRecentFileClick = onRecentFileClick,
+            onClearHistory = onClearHistory
         )
     } else {
         MarkdownViewerScreen(
@@ -258,6 +269,7 @@ fun PreviewApp() {
             recentFiles = emptyList(),
             onOpenFilePicker = {},
             onRecentFileClick = {},
+            onClearHistory = {},
             onScrollPositionChange = { _, _ -> },
             onBack = {}
         )

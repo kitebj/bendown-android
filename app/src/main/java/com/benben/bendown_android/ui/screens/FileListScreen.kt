@@ -1,7 +1,6 @@
 package com.benben.bendown_android.ui.screens
 
 import android.widget.Toast
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,12 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.benben.bendown_android.R
 import com.benben.bendown_android.data.model.RecentFile
 import java.text.SimpleDateFormat
 import java.util.*
@@ -34,16 +31,22 @@ fun FileListScreen(
     onOpenFilePicker: () -> Unit,
     recentFiles: List<RecentFile> = emptyList(),
     onRecentFileClick: (RecentFile) -> Unit = {},
+    onClearHistory: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
+    var showClearDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("BenMarkDown阅读器", fontSize = 18.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("📚", fontSize = 22.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("BenDown - 笨蛋阅读器", fontSize = 18.sp)
+                    }
                 },
                 actions = {
                     // 汉堡菜单
@@ -63,6 +66,16 @@ fun FileListScreen(
                                 onOpenFilePicker()
                             }
                         )
+                        // 只有有历史记录时才显示清除记录
+                        if (recentFiles.isNotEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("清除记录") },
+                                onClick = {
+                                    showMenu = false
+                                    showClearDialog = true
+                                }
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("设置") },
                             onClick = {
@@ -89,7 +102,7 @@ fun FileListScreen(
                 .background(Color.White)
         ) {
             if (recentFiles.isEmpty()) {
-                // 无历史记录：居中显示图片和按钮
+                // 无历史记录：居中显示图标、欢迎语和按钮
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -99,19 +112,38 @@ fun FileListScreen(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // 显示图片
-                        Image(
-                            painter = painterResource(id = R.drawable.bendown2),
-                            contentDescription = "BenDown",
-                            modifier = Modifier
-                                .fillMaxWidth(0.6f)
-                                .padding(bottom = 32.dp)
+                        // 显示图标
+                        Text(
+                            text = "📖",
+                            fontSize = 72.sp,
+                            modifier = Modifier.padding(bottom = 24.dp)
+                        )
+
+                        // 欢迎语
+                        Text(
+                            text = " Markdown",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF333333),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "简洁之美，纯粹阅读",
+                            fontSize = 14.sp,
+                            color = Color(0xFF666666),
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        Text(
+                            text = "在这里，文字不被打扰",
+                            fontSize = 13.sp,
+                            color = Color(0xFF999999),
+                            modifier = Modifier.padding(bottom = 32.dp)
                         )
 
                         // 打开文件按钮
                         Button(
                             onClick = onOpenFilePicker,
-                            modifier = Modifier.fillMaxWidth(0.6f)
+                            modifier = Modifier.fillMaxWidth(0.5f)
                         ) {
                             Text("打开文件", fontSize = 16.sp)
                         }
@@ -141,6 +173,30 @@ fun FileListScreen(
                 }
             }
         }
+    }
+
+    // 清除确认对话框
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            title = { Text("清除记录") },
+            text = { Text("确定要清除所有历史记录吗？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearDialog = false
+                        onClearHistory()
+                    }
+                ) {
+                    Text("确定", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
 
