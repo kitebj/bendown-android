@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.benben.bendown_android.data.model.RecentFile
@@ -32,10 +33,7 @@ fun FileListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "BenMarkDown阅读器",
-                        fontSize = 18.sp
-                    )
+                    Text("BenMarkDown阅读器", fontSize = 18.sp)
                 }
             )
         }
@@ -51,22 +49,19 @@ fun FileListScreen(
                 onClick = onOpenFilePicker,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = "选择本地文件",
-                    fontSize = 16.sp
-                )
+                Text("选择本地文件", fontSize = 15.sp)
             }
 
             // 历史记录列表
             if (recentFiles.isNotEmpty()) {
                 Text(
                     text = "最近打开",
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color.Gray,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp)
                 )
 
                 LazyColumn(
@@ -92,21 +87,16 @@ fun FileListScreen(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = "📖",
-                            fontSize = 48.sp,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                        Text(text = "📖", fontSize = 40.sp)
                         Text(
                             text = "暂无历史记录",
-                            fontSize = 16.sp,
+                            fontSize = 14.sp,
                             color = Color.Gray
                         )
                         Text(
                             text = "选择文件后会显示在这里",
-                            fontSize = 14.sp,
-                            color = Color.LightGray,
-                            modifier = Modifier.padding(top = 4.dp)
+                            fontSize = 12.sp,
+                            color = Color.LightGray
                         )
                     }
                 }
@@ -116,7 +106,7 @@ fun FileListScreen(
 }
 
 /**
- * 历史文件列表项
+ * 历史文件列表项（紧凑布局）
  */
 @Composable
 fun RecentFileItem(
@@ -124,48 +114,46 @@ fun RecentFileItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFF5F5F5)
-        )
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
+        // 文件图标
+        Text(
+            text = "📄",
+            fontSize = 18.sp,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+
+        // 文件信息
+        Column(modifier = Modifier.weight(1f)) {
             // 文件名
             Text(
                 text = recentFile.fileName,
-                fontSize = 16.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            // 大小和时间
+            Text(
+                text = "${recentFile.getFormattedSize()} · ${formatTime(recentFile.lastOpenedTime)}",
+                fontSize = 11.sp,
+                color = Color.Gray,
                 maxLines = 1
             )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            // 文件大小和时间
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = recentFile.getFormattedSize(),
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
-                Text(
-                    text = formatTime(recentFile.lastOpenedTime),
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
-            }
         }
     }
+
+    // 分隔线
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 38.dp, end = 12.dp),
+        thickness = 0.5.dp,
+        color = Color(0xFFE0E0E0)
+    )
 }
 
 /**
@@ -174,7 +162,7 @@ fun RecentFileItem(
 private fun formatTime(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp
-    
+
     return when {
         diff < 60 * 1000 -> "刚刚"
         diff < 60 * 60 * 1000 -> "${diff / (60 * 1000)}分钟前"
