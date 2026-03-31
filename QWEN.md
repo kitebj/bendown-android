@@ -3,7 +3,7 @@
 ## 项目信息
 - **项目名称**: BenDown Android
 - **包名**: com.benben.bendown_android
-- **当前版本**: 0.2.8
+- **当前版本**: 0.2.9
 - **开始日期**: 2024年
 - **更新日志**: [CHANGELOG.md](./CHANGELOG.md)
 
@@ -128,3 +128,6 @@ app/src/main/java/com/benben/bendown_android/
 ---
 
 **文档最后更新**: 2026-03-31
+
+## Qwen Added Memories
+- ADB 路径：D:\Android\SDK\platform-tools\adb.exe

@@ -34,16 +34,20 @@ fun MarkdownTable(
 ) {
     val scrollState = rememberScrollState()
     
+    // 计算每列的最小宽度
+    val columnCount = maxOf(headers.size, rows.maxOfOrNull { it.size } ?: 0)
+    val minWidth = (columnCount * 80).dp // 每列至少 80dp
+
     Column(
         modifier = modifier
-            .fillMaxWidth()
             .padding(vertical = 8.dp)
             .horizontalScroll(scrollState)
+            .widthIn(min = minWidth)
     ) {
         // 表头
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .widthIn(min = minWidth)
                 .background(Color(0xFFF5F5F5))
         ) {
             headers.forEachIndexed { index, header ->
@@ -51,7 +55,9 @@ fun MarkdownTable(
                     text = header,
                     alignment = alignments.getOrElse(index) { TableAlignment.LEFT },
                     isHeader = true,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .defaultMinSize(minWidth = 60.dp)
                 )
             }
         }
@@ -66,7 +72,7 @@ fun MarkdownTable(
         rows.forEachIndexed { rowIndex, row ->
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .widthIn(min = minWidth)
                     .background(if (rowIndex % 2 == 0) Color.White else Color(0xFFFAFAFA))
             ) {
                 row.forEachIndexed { index, cell ->
@@ -74,7 +80,9 @@ fun MarkdownTable(
                         text = cell,
                         alignment = alignments.getOrElse(index) { TableAlignment.LEFT },
                         isHeader = false,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .defaultMinSize(minWidth = 60.dp)
                     )
                 }
             }
@@ -113,6 +121,5 @@ fun TableCell(
         textAlign = textAlign,
         modifier = modifier
             .padding(horizontal = 8.dp, vertical = 6.dp)
-            .fillMaxWidth()
     )
 }

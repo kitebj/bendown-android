@@ -1,11 +1,13 @@
 package com.benben.bendown_android.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
@@ -14,10 +16,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import com.benben.bendown_android.R
 import com.benben.bendown_android.data.model.RecentFile
 import java.text.SimpleDateFormat
 import java.util.*
@@ -37,6 +42,7 @@ fun FileListScreen(
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -94,7 +100,7 @@ fun FileListScreen(
                             leadingIcon = { Text("ℹ️", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
                             onClick = {
                                 showMenu = false
-                                Toast.makeText(context, "功能开发中", Toast.LENGTH_SHORT).show()
+                                showAboutDialog = true
                             },
                             modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
                         )
@@ -206,6 +212,11 @@ fun FileListScreen(
             }
         )
     }
+
+    // 关于弹窗
+    if (showAboutDialog) {
+        AboutDialog(onDismiss = { showAboutDialog = false })
+    }
 }
 
 /**
@@ -274,6 +285,78 @@ private fun formatTime(timestamp: Long): String {
         else -> {
             val sdf = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
             sdf.format(Date(timestamp))
+        }
+    }
+}
+
+/**
+ * 关于弹窗
+ */
+@Composable
+fun AboutDialog(onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White
+        ) {
+            Row(
+                modifier = Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 左侧图片 (1/3 宽度)
+                Image(
+                    painter = painterResource(id = R.drawable.bendown3),
+                    contentDescription = "App Logo",
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(end = 16.dp)
+                )
+
+                // 右侧信息 (2/3 宽度)
+                Column(
+                    modifier = Modifier.weight(2f),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    // APP 名称
+                    Text(
+                        text = "BenDown - 笨蛋阅读器",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF333333)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // 版本号
+                    Text(
+                        text = "版本：0.2.8",
+                        fontSize = 13.sp,
+                        color = Color(0xFF666666)
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // 最后更新日期
+                    Text(
+                        text = "更新：2026-03-31",
+                        fontSize = 13.sp,
+                        color = Color(0xFF666666)
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // 作者
+                    Text(
+                        text = "作者：笨笨 + AI助手",
+                        fontSize = 13.sp,
+                        color = Color(0xFF666666)
+                    )
+                }
+            }
         }
     }
 }
