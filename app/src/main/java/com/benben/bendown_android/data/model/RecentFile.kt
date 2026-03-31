@@ -1,0 +1,59 @@
+package com.benben.bendown_android.data.model
+
+import android.net.Uri
+import org.json.JSONObject
+
+/**
+ * 最近打开的文件记录
+ */
+data class RecentFile(
+    val fileName: String,       // 文件名
+    val uriString: String,      // URI 字符串
+    val fileSize: Long,         // 文件大小（字节）
+    val lastOpenedTime: Long    // 最后打开时间（时间戳）
+) {
+    val uri: Uri
+        get() = Uri.parse(uriString)
+
+    /**
+     * 格式化文件大小显示
+     */
+    fun getFormattedSize(): String {
+        return when {
+            fileSize < 1024 -> "$fileSize B"
+            fileSize < 1024 * 1024 -> String.format("%.1f KB", fileSize / 1024.0)
+            else -> String.format("%.1f MB", fileSize / (1024.0 * 1024))
+        }
+    }
+
+    /**
+     * 转换为 JSON 字符串
+     */
+    fun toJson(): String {
+        return JSONObject().apply {
+            put("fileName", fileName)
+            put("uriString", uriString)
+            put("fileSize", fileSize)
+            put("lastOpenedTime", lastOpenedTime)
+        }.toString()
+    }
+
+    companion object {
+        /**
+         * 从 JSON 字符串解析
+         */
+        fun fromJson(json: String): RecentFile? {
+            return try {
+                val obj = JSONObject(json)
+                RecentFile(
+                    fileName = obj.getString("fileName"),
+                    uriString = obj.getString("uriString"),
+                    fileSize = obj.getLong("fileSize"),
+                    lastOpenedTime = obj.getLong("lastOpenedTime")
+                )
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+}
