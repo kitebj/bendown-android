@@ -3,7 +3,7 @@
 ## 项目信息
 - **项目名称**: BenDown Android
 - **包名**: com.benben.bendown_android
-- **当前版本**: 0.1.2
+- **当前版本**: 0.2.0
 - **开始日期**: 2024年
 - **更新日志**: [CHANGELOG.md](./CHANGELOG.md)
 

@@ -41,7 +41,10 @@ class MainActivity : ComponentActivity() {
     // 当前打开的文件
     private var selectedFile by mutableStateOf<MarkdownFile?>(null)
 
-    // 历史记录列表
+    // 当前文件的初始滚动位置
+    private var initialScrollPosition by mutableStateOf(0)
+
+    // 历史记录列表（显示用）
     private var recentFiles by mutableStateOf<List<RecentFile>>(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,11 +60,16 @@ class MainActivity : ComponentActivity() {
                 MarkdownReaderApp(
                     documentResolver = documentResolver,
                     selectedFile = selectedFile,
+                    initialScrollPosition = initialScrollPosition,
                     recentFiles = recentFiles,
                     onOpenFilePicker = { openFilePicker() },
                     onRecentFileClick = { recentFile -> openRecentFile(recentFile) },
-                    onBack = { 
+                    onScrollPositionChange = { uriString, position ->
+                        recentFilesManager.updateScrollPosition(uriString, position)
+                    },
+                    onBack = {
                         selectedFile = null
+                        initialScrollPosition = 0
                         loadRecentFiles()
                     }
                 )
@@ -78,10 +86,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun loadRecentFiles() {
-        recentFiles = recentFilesManager.getAll()
+        recentFiles = recentFilesManager.getDisplayList()
     }
 
     private fun openRecentFile(recentFile: RecentFile) {
+        // 恢复滚动位置
+        initialScrollPosition = recentFile.scrollPosition
         openFileFromUri(recentFile.uri)
     }
 
@@ -150,6 +160,12 @@ class MainActivity : ComponentActivity() {
         // 获取文件大小
         val fileSize = getFileSize(uri)
 
+        // 获取之前的滚动位置（如果有的话）
+        val existingRecord = recentFilesManager.getByUri(uri.toString())
+        if (existingRecord != null && initialScrollPosition == 0) {
+            initialScrollPosition = existingRecord.scrollPosition
+        }
+
         // 创建 MarkdownFile 对象
         val markdownFile = MarkdownFile(
             name = fileName,
@@ -162,7 +178,8 @@ class MainActivity : ComponentActivity() {
             fileName = fileName,
             uriString = uri.toString(),
             fileSize = fileSize,
-            lastOpenedTime = System.currentTimeMillis()
+            lastOpenedTime = System.currentTimeMillis(),
+            scrollPosition = existingRecord?.scrollPosition ?: 0
         )
         recentFilesManager.add(recentFile)
 
@@ -202,9 +219,11 @@ class MainActivity : ComponentActivity() {
 fun MarkdownReaderApp(
     documentResolver: DocumentResolver,
     selectedFile: MarkdownFile?,
+    initialScrollPosition: Int,
     recentFiles: List<RecentFile>,
     onOpenFilePicker: () -> Unit,
     onRecentFileClick: (RecentFile) -> Unit,
+    onScrollPositionChange: (String, Int) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -220,7 +239,9 @@ fun MarkdownReaderApp(
             file = selectedFile,
             documentResolver = documentResolver,
             context = context,
-            onBack = onBack
+            initialScrollPosition = initialScrollPosition,
+            onBack = onBack,
+            onScrollPositionChange = onScrollPositionChange
         )
     }
 }
@@ -233,9 +254,11 @@ fun PreviewApp() {
         MarkdownReaderApp(
             documentResolver = SimpleDocumentResolver(context),
             selectedFile = null,
+            initialScrollPosition = 0,
             recentFiles = emptyList(),
             onOpenFilePicker = {},
             onRecentFileClick = {},
+            onScrollPositionChange = { _, _ -> },
             onBack = {}
         )
     }

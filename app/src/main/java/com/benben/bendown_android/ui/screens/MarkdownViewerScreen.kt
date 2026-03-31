@@ -29,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -65,7 +66,9 @@ fun MarkdownViewerScreen(
     file: MarkdownFile,
     documentResolver: DocumentResolver,
     context: Context,
+    initialScrollPosition: Int = 0,
     onBack: () -> Unit,
+    onScrollPositionChange: (String, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var fileContent by remember { mutableStateOf<String?>(null) }
@@ -174,6 +177,12 @@ fun MarkdownViewerScreen(
                     MarkdownContentWithStatus(
                         content = fileContent!!,
                         fileSize = fileSize,
+                        initialScrollPosition = initialScrollPosition,
+                        onScrollPositionChange = { position ->
+                            file.uri?.let { uri ->
+                                onScrollPositionChange(uri.toString(), position)
+                            }
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -189,11 +198,22 @@ fun MarkdownViewerScreen(
 fun MarkdownContentWithStatus(
     content: String,
     fileSize: Long,
+    initialScrollPosition: Int = 0,
+    onScrollPositionChange: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
     val lines = content.lines()
     val totalItems = lines.size
+    val scope = rememberCoroutineScope()
+
+    // 恢复初始滚动位置
+    LaunchedEffect(initialScrollPosition, content) {
+        if (initialScrollPosition > 0 && totalItems > 0) {
+            val targetItem = (totalItems * initialScrollPosition / 100).coerceIn(0, totalItems - 1)
+            listState.scrollToItem(targetItem)
+        }
+    }
 
     // 计算阅读进度
     val scrollProgress by remember {
@@ -214,6 +234,13 @@ fun MarkdownContentWithStatus(
                 val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                 ((lastVisibleItem + 1) * 100 / totalItems).coerceIn(0, 100)
             }
+        }
+    }
+
+    // 退出时保存滚动位置
+    DisposableEffect(Unit) {
+        onDispose {
+            onScrollPositionChange(scrollProgress)
         }
     }
 
