@@ -1,7 +1,9 @@
 package com.benben.bendown_android.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,10 +32,13 @@ fun MarkdownTable(
     rows: List<List<String>>,
     modifier: Modifier = Modifier
 ) {
+    val scrollState = rememberScrollState()
+    
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
+            .horizontalScroll(scrollState)
     ) {
         // 表头
         Row(
