@@ -3,12 +3,16 @@ package com.benben.bendown_android.ui.screens
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
@@ -46,7 +51,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.benben.bendown_android.data.model.MarkdownFile
@@ -83,6 +91,9 @@ fun MarkdownViewerScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showMenu by remember { mutableStateOf(false) }
+    
+    // 滚动状态（提取到外层以便共享）
+    val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
     // 检查是否是错误提示文件
@@ -102,6 +113,13 @@ fun MarkdownViewerScreen(
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(Intent.createChooser(shareIntent, "分享文件"))
+        }
+    }
+
+    // 回到顶部
+    fun scrollToTop() {
+        scope.launch {
+            listState.animateScrollToItem(0)
         }
     }
 
@@ -150,7 +168,12 @@ fun MarkdownViewerScreen(
                     Text(
                         file.displayName,
                         fontSize = 16.sp,
-                        maxLines = 1
+                        maxLines = 1,
+                        modifier = Modifier.pointerInput(Unit) {
+                            detectTapGestures(
+                                onDoubleTap = { scrollToTop() }
+                            )
+                        }
                     )
                 },
                 navigationIcon = {
@@ -233,6 +256,7 @@ fun MarkdownViewerScreen(
                     MarkdownContentWithStatus(
                         content = fileContent!!,
                         fileSize = fileSize,
+                        listState = listState,
                         initialScrollPosition = initialScrollPosition,
                         onScrollPositionChange = { position ->
                             file.uri?.let { uri ->
@@ -254,23 +278,20 @@ fun MarkdownViewerScreen(
 fun MarkdownContentWithStatus(
     content: String,
     fileSize: Long,
+    listState: LazyListState,
     initialScrollPosition: Int = 0,
     onScrollPositionChange: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val listState = rememberLazyListState()
     val lines = content.lines()
     val scope = rememberCoroutineScope()
 
     // 恢复初始滚动位置
     LaunchedEffect(initialScrollPosition, content) {
         if (initialScrollPosition > 0) {
-            // 延迟一点等待内容加载完成
             kotlinx.coroutines.delay(100)
             val totalItems = listState.layoutInfo.totalItemsCount
             if (totalItems > 1) {
-                // 与计算进度相同的公式：progress = firstVisibleItem * 100 / (totalItems - 1)
-                // 反推：firstVisibleItem = progress * (totalItems - 1) / 100
                 val targetItem = (initialScrollPosition * (totalItems - 1) / 100).coerceIn(0, totalItems - 1)
                 listState.scrollToItem(targetItem)
             }
@@ -313,11 +334,22 @@ fun MarkdownContentWithStatus(
     }
 
     Box(modifier = modifier) {
-        // 内容区域
-        MarkdownContentLazy(
-            content = content,
+        // 内容区域（可选择文字）
+        SelectionContainer {
+            MarkdownContentLazy(
+                content = content,
+                listState = listState,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // 滚动条
+        SimpleScrollbar(
             listState = listState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 4.dp)
+                .fillMaxHeight(0.7f)
         )
 
         // 底部状态条
@@ -326,6 +358,57 @@ fun MarkdownContentWithStatus(
             progress = scrollProgress,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+    }
+}
+
+/**
+ * 简单滚动条（滚动时显示，停止后自动隐藏）
+ */
+@Composable
+fun SimpleScrollbar(
+    listState: LazyListState,
+    modifier: Modifier = Modifier
+) {
+    // 是否正在滚动
+    val isScrollInProgress = listState.isScrollInProgress
+
+    // 动画透明度
+    val alpha by animateFloatAsState(
+        targetValue = if (isScrollInProgress) 0.5f else 0f,
+        animationSpec = tween(durationMillis = 500),
+        label = "scrollbar_alpha"
+    )
+
+    // 滚动进度 (0f - 1f)
+    val scrollProgress by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            if (totalItems <= 1) return@derivedStateOf 0f
+
+            val firstVisibleItem = listState.firstVisibleItemIndex.toFloat()
+            firstVisibleItem / (totalItems - 1)
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .width(3.dp)
+            .padding(vertical = 4.dp)
+    ) {
+        if (alpha > 0.01f) {
+            // 滚动条滑块
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.15f) // 滑块占总高度的15%
+                    .graphicsLayer {
+                        translationY = scrollProgress * (size.height * 0.85f)
+                        this.alpha = alpha
+                    }
+                    .background(Color(0xFF666666), RoundedCornerShape(1.5.dp))
+            )
+        }
     }
 }
 
