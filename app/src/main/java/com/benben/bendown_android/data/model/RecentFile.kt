@@ -1,6 +1,7 @@
 package com.benben.bendown_android.data.model
 
 import android.net.Uri
+import com.benben.bendown_android.data.formatFileSize
 import org.json.JSONObject
 
 /**
@@ -19,13 +20,7 @@ data class RecentFile(
     /**
      * 格式化文件大小显示
      */
-    fun getFormattedSize(): String {
-        return when {
-            fileSize < 1024 -> "$fileSize B"
-            fileSize < 1024 * 1024 -> String.format("%.1f KB", fileSize / 1024.0)
-            else -> String.format("%.1f MB", fileSize / (1024.0 * 1024))
-        }
-    }
+    fun getFormattedSize(): String = fileSize.formatFileSize()
 
     /**
      * 转换为 JSON 字符串

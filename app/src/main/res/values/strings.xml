@@ -1,3 +1,28 @@
 <resources>
     <string name="app_name">笨蛋阅读器</string>
+    <string name="app_title">BenDown - 笨蛋阅读器</string>
+    
+    <!-- 首页 -->
+    <string name="welcome_title">简洁之美，纯粹阅读</string>
+    <string name="welcome_subtitle">在这里，文字不被打扰</string>
+    <string name="open_file">打开文件</string>
+    <string name="clear_history">清除记录</string>
+    <string name="settings">设置</string>
+    <string name="about">关于</string>
+    <string name="no_history">暂无阅读记录</string>
+    
+    <!-- 阅读页 -->
+    <string name="share">分享</string>
+    <string name="close">关闭</string>
+    <string name="loading">正在读取文件…</string>
+    <string name="unnamed_file">未命名文件.md</string>
+    <string name="unsupported_file_type">不支持的文件类型</string>
+    
+    <!-- 提示 -->
+    <string name="share_file">分享文件</string>
+    <string name="clear_history_confirm">确定清除所有阅读记录？</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确定</string>
+    <string name="developing">功能开发中</string>
+    <string name="open_file_failed">打开文件失败: %s</string>
 </resources>

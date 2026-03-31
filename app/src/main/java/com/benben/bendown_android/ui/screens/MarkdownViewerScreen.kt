@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.benben.bendown_android.data.formatFileSize
 import com.benben.bendown_android.data.model.MarkdownFile
 import com.benben.bendown_android.data.resolver.DocumentResolver
 import com.benben.bendown_android.ui.components.MarkdownCodeBlock
@@ -434,7 +435,7 @@ fun ReadingStatusBar(
         ) {
             // 文件大小
             Text(
-                text = formatFileSize(fileSize),
+                text = fileSize.formatFileSize(),
                 fontSize = 11.sp,
                 color = Color(0xFF999999)
             )
@@ -446,17 +447,6 @@ fun ReadingStatusBar(
                 color = Color(0xFF999999)
             )
         }
-    }
-}
-
-/**
- * 格式化文件大小
- */
-private fun formatFileSize(size: Long): String {
-    return when {
-        size < 1024 -> "$size B"
-        size < 1024 * 1024 -> String.format("%.1f KB", size / 1024.0)
-        else -> String.format("%.1f MB", size / (1024.0 * 1024))
     }
 }
 
