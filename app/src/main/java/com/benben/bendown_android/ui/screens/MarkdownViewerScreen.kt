@@ -1,6 +1,7 @@
 package com.benben.bendown_android.ui.screens
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -79,6 +80,11 @@ fun MarkdownViewerScreen(
 
     // 检查是否是错误提示文件
     val isErrorFile = file.displayName.startsWith("❌")
+
+    // 拦截系统后退键
+    BackHandler(enabled = true) {
+        onBack()
+    }
 
     // 读取文件内容
     LaunchedEffect(file) {
@@ -204,43 +210,55 @@ fun MarkdownContentWithStatus(
 ) {
     val listState = rememberLazyListState()
     val lines = content.lines()
-    val totalItems = lines.size
     val scope = rememberCoroutineScope()
 
     // 恢复初始滚动位置
     LaunchedEffect(initialScrollPosition, content) {
-        if (initialScrollPosition > 0 && totalItems > 0) {
-            val targetItem = (totalItems * initialScrollPosition / 100).coerceIn(0, totalItems - 1)
-            listState.scrollToItem(targetItem)
-        }
-    }
-
-    // 计算阅读进度
-    val scrollProgress by remember {
-        derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-
-            // 如果没有内容，返回 100%
-            if (totalItems == 0 || layoutInfo.totalItemsCount == 0) {
-                100
-            } else if (!listState.canScrollForward) {
-                // 已经到底了
-                100
-            } else if (!listState.canScrollBackward && !listState.canScrollForward) {
-                // 内容不足一屏
-                100
-            } else {
-                // 计算当前可见的最后一个 item 的索引
-                val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                ((lastVisibleItem + 1) * 100 / totalItems).coerceIn(0, 100)
+        if (initialScrollPosition > 0) {
+            // 延迟一点等待内容加载完成
+            kotlinx.coroutines.delay(100)
+            val totalItems = listState.layoutInfo.totalItemsCount
+            if (totalItems > 1) {
+                // 与计算进度相同的公式：progress = firstVisibleItem * 100 / (totalItems - 1)
+                // 反推：firstVisibleItem = progress * (totalItems - 1) / 100
+                val targetItem = (initialScrollPosition * (totalItems - 1) / 100).coerceIn(0, totalItems - 1)
+                listState.scrollToItem(targetItem)
             }
         }
     }
 
-    // 退出时保存滚动位置
+    // 计算阅读进度（带小数）
+    val scrollProgress by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+
+            // 如果没有内容，返回 0%
+            if (totalItems == 0) {
+                0.0
+            } else if (!listState.canScrollForward && listState.canScrollBackward) {
+                // 已经到底了（可以往上滚，不能往下滚）
+                100.0
+            } else if (!listState.canScrollBackward && !listState.canScrollForward) {
+                // 内容不足一屏
+                100.0
+            } else {
+                // 使用第一个可见 item 计算进度（更能代表当前阅读位置）
+                val firstVisibleItem = listState.firstVisibleItemIndex
+                // 总数减1是因为 index 从 0 开始
+                if (totalItems > 1) {
+                    (firstVisibleItem * 100.0 / (totalItems - 1)).coerceIn(0.0, 100.0)
+                } else {
+                    100.0
+                }
+            }
+        }
+    }
+
+    // 退出时保存滚动位置（取整保存）
     DisposableEffect(Unit) {
         onDispose {
-            onScrollPositionChange(scrollProgress)
+            onScrollPositionChange(scrollProgress.toInt())
         }
     }
 
@@ -267,7 +285,7 @@ fun MarkdownContentWithStatus(
 @Composable
 fun ReadingStatusBar(
     fileSize: Long,
-    progress: Int,
+    progress: Double,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -287,10 +305,10 @@ fun ReadingStatusBar(
                 fontSize = 11.sp,
                 color = Color(0xFF999999)
             )
-            
-            // 阅读进度
+
+            // 阅读进度（两位小数）
             Text(
-                text = "$progress%",
+                text = String.format("%.2f%%", progress),
                 fontSize = 11.sp,
                 color = Color(0xFF999999)
             )

@@ -1,19 +1,26 @@
 package com.benben.bendown_android.ui.screens
 
+import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.benben.bendown_android.R
 import com.benben.bendown_android.data.model.RecentFile
 import java.text.SimpleDateFormat
 import java.util.*
@@ -29,11 +36,48 @@ fun FileListScreen(
     onRecentFileClick: (RecentFile) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var showMenu by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text("BenMarkDown阅读器", fontSize = 18.sp)
+                },
+                actions = {
+                    // 汉堡菜单
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Filled.Menu, "菜单")
+                    }
+
+                    // 下拉菜单
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("打开文件") },
+                            onClick = {
+                                showMenu = false
+                                onOpenFilePicker()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("设置") },
+                            onClick = {
+                                showMenu = false
+                                Toast.makeText(context, "功能开发中", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("关于...") },
+                            onClick = {
+                                showMenu = false
+                                Toast.makeText(context, "功能开发中", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
                 }
             )
         }
@@ -44,18 +88,37 @@ fun FileListScreen(
                 .padding(paddingValues)
                 .background(Color.White)
         ) {
-            // 选择文件按钮
-            Button(
-                onClick = onOpenFilePicker,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                Text("选择本地文件", fontSize = 15.sp)
-            }
+            if (recentFiles.isEmpty()) {
+                // 无历史记录：居中显示图片和按钮
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // 显示图片
+                        Image(
+                            painter = painterResource(id = R.drawable.bendown2),
+                            contentDescription = "BenDown",
+                            modifier = Modifier
+                                .fillMaxWidth(0.6f)
+                                .padding(bottom = 32.dp)
+                        )
 
-            // 历史记录列表
-            if (recentFiles.isNotEmpty()) {
+                        // 打开文件按钮
+                        Button(
+                            onClick = onOpenFilePicker,
+                            modifier = Modifier.fillMaxWidth(0.6f)
+                        ) {
+                            Text("打开文件", fontSize = 16.sp)
+                        }
+                    }
+                }
+            } else {
+                // 有历史记录：只显示历史列表
                 Text(
                     text = "最近打开",
                     fontSize = 13.sp,
@@ -73,30 +136,6 @@ fun FileListScreen(
                         RecentFileItem(
                             recentFile = recentFile,
                             onClick = { onRecentFileClick(recentFile) }
-                        )
-                    }
-                }
-            } else {
-                // 没有历史记录时显示提示
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = "📖", fontSize = 40.sp)
-                        Text(
-                            text = "暂无历史记录",
-                            fontSize = 14.sp,
-                            color = Color.Gray
-                        )
-                        Text(
-                            text = "选择文件后会显示在这里",
-                            fontSize = 12.sp,
-                            color = Color.LightGray
                         )
                     }
                 }
