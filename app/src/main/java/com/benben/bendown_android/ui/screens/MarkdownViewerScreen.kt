@@ -1,6 +1,7 @@
 package com.benben.bendown_android.ui.screens
 
 import android.content.Context
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -12,14 +13,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -28,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -76,6 +82,7 @@ fun MarkdownViewerScreen(
     var fileSize by remember { mutableStateOf(0L) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showMenu by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // 检查是否是错误提示文件
@@ -84,6 +91,18 @@ fun MarkdownViewerScreen(
     // 拦截系统后退键
     BackHandler(enabled = true) {
         onBack()
+    }
+
+    // 分享文件
+    fun shareFile() {
+        file.uri?.let { uri ->
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(shareIntent, "分享文件"))
+        }
     }
 
     // 读取文件内容
@@ -137,6 +156,37 @@ fun MarkdownViewerScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                    }
+                },
+                actions = {
+                    // 三点菜单
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, "菜单")
+                    }
+
+                    // 下拉菜单
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("分享", modifier = Modifier.padding(start = 2.dp)) },
+                            leadingIcon = { Text("📤", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
+                            onClick = {
+                                showMenu = false
+                                shareFile()
+                            },
+                            modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
+                        )
+                        DropdownMenuItem(
+                            text = { Text("关闭", modifier = Modifier.padding(start = 2.dp)) },
+                            leadingIcon = { Text("🚪", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
+                            onClick = {
+                                showMenu = false
+                                onBack()
+                            },
+                            modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
+                        )
                     }
                 }
             )

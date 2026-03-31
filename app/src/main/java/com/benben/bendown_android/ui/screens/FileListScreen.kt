@@ -60,35 +60,43 @@ fun FileListScreen(
                         onDismissRequest = { showMenu = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("打开文件") },
+                            text = { Text("打开文件", modifier = Modifier.padding(start = 2.dp)) },
+                            leadingIcon = { Text("📂", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
                             onClick = {
                                 showMenu = false
                                 onOpenFilePicker()
-                            }
+                            },
+                            modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
                         )
                         // 只有有历史记录时才显示清除记录
                         if (recentFiles.isNotEmpty()) {
                             DropdownMenuItem(
-                                text = { Text("清除记录") },
+                                text = { Text("清除记录", modifier = Modifier.padding(start = 2.dp)) },
+                                leadingIcon = { Text("🗑️", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
                                 onClick = {
                                     showMenu = false
                                     showClearDialog = true
-                                }
+                                },
+                                modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
                             )
                         }
                         DropdownMenuItem(
-                            text = { Text("设置") },
+                            text = { Text("设置", modifier = Modifier.padding(start = 2.dp)) },
+                            leadingIcon = { Text("⚙️", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
                             onClick = {
                                 showMenu = false
                                 Toast.makeText(context, "功能开发中", Toast.LENGTH_SHORT).show()
-                            }
+                            },
+                            modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
                         )
                         DropdownMenuItem(
-                            text = { Text("关于...") },
+                            text = { Text("关于", modifier = Modifier.padding(start = 2.dp)) },
+                            leadingIcon = { Text("ℹ️", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
                             onClick = {
                                 showMenu = false
                                 Toast.makeText(context, "功能开发中", Toast.LENGTH_SHORT).show()
-                            }
+                            },
+                            modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
                         )
                     }
                 }
