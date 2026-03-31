@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -108,12 +109,28 @@ fun MarkdownViewerScreen(
     // 分享文件
     fun shareFile() {
         file.uri?.let { uri ->
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            try {
+                val isLocalFile = uri.toString().startsWith("file:")
+                
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/markdown"
+                    if (isLocalFile) {
+                        // 本地文件：直接分享文本内容
+                        val filePath = uri.path
+                        if (filePath != null) {
+                            val content = java.io.File(filePath).readText()
+                            putExtra(Intent.EXTRA_TEXT, content)
+                        }
+                    } else {
+                        // content:// URI：分享文件流
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "分享文件"))
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(context, "分享失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
             }
-            context.startActivity(Intent.createChooser(shareIntent, "分享文件"))
         }
     }
 
@@ -152,6 +169,12 @@ fun MarkdownViewerScreen(
 
                 fileContent = content
                 fileSize = content.length.toLong()
+            } catch (e: java.lang.SecurityException) {
+                // 权限丢失，通常是从微信/QQ分享的文件
+                errorMessage = "❌ 无法访问此文件\n\n此文件来自其他应用分享，访问权限已失效。\n\n建议：请从原应用重新分享文件。"
+            } catch (e: java.lang.IllegalArgumentException) {
+                // URI 无法打开
+                errorMessage = "❌ 文件已不可访问\n\n${e.message}\n\n此文件可能已被删除或移动。"
             } catch (e: IOException) {
                 errorMessage = "❌ 读取文件失败\n\n${e.message}"
             } catch (e: Exception) {
@@ -188,28 +211,38 @@ fun MarkdownViewerScreen(
                         Icon(Icons.Default.MoreVert, "菜单")
                     }
 
-                    // 下拉菜单
+                    // 下拉菜单（长按菜单风格）
                     DropdownMenu(
                         expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier
+                            .background(
+                                Color.White,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(vertical = 6.dp)
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("分享", modifier = Modifier.padding(start = 2.dp)) },
-                            leadingIcon = { Text("📤", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
-                            onClick = {
-                                showMenu = false
-                                shareFile()
-                            },
-                            modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
+                        Text(
+                            text = "分享...",
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showMenu = false
+                                    shareFile()
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
                         )
-                        DropdownMenuItem(
-                            text = { Text("关闭", modifier = Modifier.padding(start = 2.dp)) },
-                            leadingIcon = { Text("🚪", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
-                            onClick = {
-                                showMenu = false
-                                onBack()
-                            },
-                            modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
+                        Text(
+                            text = "关闭",
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showMenu = false
+                                    onBack()
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
                         )
                     }
                 }

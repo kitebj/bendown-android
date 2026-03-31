@@ -97,49 +97,62 @@ fun FileListScreen(
                         Icon(Icons.Filled.Menu, "菜单")
                     }
 
-                    // 下拉菜单
+                    // 下拉菜单（长按菜单风格）
                     DropdownMenu(
                         expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier
+                            .background(
+                                Color.White,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(vertical = 6.dp)
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("打开文件", modifier = Modifier.padding(start = 2.dp)) },
-                            leadingIcon = { Text("📂", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
-                            onClick = {
-                                showMenu = false
-                                onOpenFilePicker()
-                            },
-                            modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
-                        )
-                        // 只有有历史记录时才显示清除记录
-                        if (recentFiles.isNotEmpty()) {
-                            DropdownMenuItem(
-                                text = { Text("清除记录", modifier = Modifier.padding(start = 2.dp)) },
-                                leadingIcon = { Text("🗑️", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
-                                onClick = {
+                        Text(
+                            text = "打开文件",
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
                                     showMenu = false
-                                    showClearDialog = true
-                                },
-                                modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
+                                    onOpenFilePicker()
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
+                        )
+                        if (recentFiles.isNotEmpty()) {
+                            Text(
+                                text = "清除记录",
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showMenu = false
+                                        showClearDialog = true
+                                    }
+                                    .padding(horizontal = 20.dp, vertical = 10.dp)
                             )
                         }
-                        DropdownMenuItem(
-                            text = { Text("设置", modifier = Modifier.padding(start = 2.dp)) },
-                            leadingIcon = { Text("⚙️", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
-                            onClick = {
-                                showMenu = false
-                                Toast.makeText(context, "功能开发中", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
+                        Text(
+                            text = "设置",
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showMenu = false
+                                    Toast.makeText(context, "功能开发中", Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
                         )
-                        DropdownMenuItem(
-                            text = { Text("关于", modifier = Modifier.padding(start = 2.dp)) },
-                            leadingIcon = { Text("ℹ️", fontSize = 16.sp, modifier = Modifier.padding(end = 0.dp)) },
-                            onClick = {
-                                showMenu = false
-                                showAboutDialog = true
-                            },
-                            modifier = Modifier.padding(vertical = 0.dp, horizontal = 8.dp)
+                        Text(
+                            text = "关于",
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showMenu = false
+                                    showAboutDialog = true
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
                         )
                     }
                 }

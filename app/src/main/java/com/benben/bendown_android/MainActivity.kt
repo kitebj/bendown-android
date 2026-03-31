@@ -207,10 +207,21 @@ class MainActivity : ComponentActivity() {
     private fun shareFile(recentFile: RecentFile) {
         try {
             val uri = recentFile.uri
+            val isLocalFile = recentFile.uriString.startsWith("file:")
+            
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/markdown"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (isLocalFile) {
+                    // 本地文件：需要通过 FileProvider 分享
+                    // 直接分享文本内容
+                    val file = java.io.File(uri.path ?: return)
+                    val content = file.readText()
+                    putExtra(Intent.EXTRA_TEXT, content)
+                } else {
+                    // content:// URI：分享文件流
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
             }
             startActivity(Intent.createChooser(shareIntent, "分享文件"))
         } catch (e: Exception) {
@@ -479,8 +490,46 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // 获取文件大小
-        val fileSize = getFileSize(uri)
+        // 对于外部文件（content://），尝试保存到本地
+        var finalUri = uri
+        var finalSource = source
+        var fileSize = 0L
+        
+        if (uri.scheme == "content") {
+            // 检查是否已有本地副本
+            val existingRecord = recentFilesManager.getByUri(uri.toString())
+            val localUriString = existingRecord?.uriString?.takeIf { it.startsWith("file:") }
+            
+            if (localUriString != null) {
+                // 已有本地副本，直接使用
+                finalUri = Uri.parse(localUriString)
+                val localFile = File(finalUri.path ?: "")
+                if (localFile.exists()) {
+                    fileSize = localFile.length()
+                    finalSource = existingRecord.source
+                }
+            } else {
+                // 尝试保存到本地
+                try {
+                    val savedFile = saveExternalToLocal(uri, fileName)
+                    if (savedFile != null) {
+                        finalUri = Uri.fromFile(savedFile)
+                        fileSize = savedFile.length()
+                        // 保存成功，提示用户
+                        Toast.makeText(this, "已保存到本地：$fileName", Toast.LENGTH_SHORT).show()
+                    } else {
+                        // 保存失败，使用原URI
+                        fileSize = getFileSize(uri)
+                    }
+                } catch (e: Exception) {
+                    // 保存失败，使用原URI
+                    fileSize = getFileSize(uri)
+                }
+            }
+        } else if (uri.scheme == "file") {
+            // 本地文件，直接获取大小
+            fileSize = getFileSize(uri)
+        }
 
         // 获取之前的滚动位置（如果有的话）
         val existingRecord = recentFilesManager.getByUri(uri.toString())
@@ -491,15 +540,17 @@ class MainActivity : ComponentActivity() {
         // 创建 MarkdownFile 对象
         val markdownFile = MarkdownFile(
             name = fileName,
-            uri = uri,
+            uri = finalUri,
             displayName = fileName
         )
 
-        // 保存到历史记录（如果已有记录且没有新来源，保留原来源）
-        val finalSource = if (source.isNotBlank()) source else existingRecord?.source ?: ""
+        // 保存到历史记录
+        if (finalSource.isBlank()) {
+            finalSource = existingRecord?.source ?: ""
+        }
         val recentFile = RecentFile(
             fileName = fileName,
-            uriString = uri.toString(),
+            uriString = finalUri.toString(),
             fileSize = fileSize,
             lastOpenedTime = System.currentTimeMillis(),
             scrollPosition = existingRecord?.scrollPosition ?: 0,
@@ -509,6 +560,56 @@ class MainActivity : ComponentActivity() {
 
         // 打开文件
         selectedFile = markdownFile
+    }
+
+    /**
+     * 将外部文件保存到本地
+     * 如果同名文件已存在：
+     * - 内容相同：跳过，返回现有文件
+     * - 内容不同：加数字后缀保存
+     */
+    private fun saveExternalToLocal(uri: Uri, fileName: String): File? {
+        return try {
+            // 读取内容
+            val inputStream = contentResolver.openInputStream(uri) ?: return null
+            val content = inputStream.bufferedReader().readText()
+            inputStream.close()
+            
+            // 检查文件大小（最大10MB）
+            if (content.length > 10 * 1024 * 1024) {
+                return null
+            }
+            
+            // 检查同名文件是否存在
+            var localFile = File(filesDir, fileName)
+            if (localFile.exists()) {
+                // 比较内容
+                val existingContent = localFile.readText()
+                if (existingContent == content) {
+                    // 内容相同，直接返回现有文件
+                    return localFile
+                }
+                // 内容不同，找一个新的文件名
+                val baseName = fileName.substringBeforeLast(".")
+                val extension = fileName.substringAfterLast(".", "")
+                var index = 1
+                while (localFile.exists()) {
+                    val newName = if (extension.isNotEmpty()) {
+                        "${baseName}_$index.$extension"
+                    } else {
+                        "${baseName}_$index"
+                    }
+                    localFile = File(filesDir, newName)
+                    index++
+                }
+            }
+            
+            // 保存到本地
+            localFile.writeText(content)
+            localFile
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun getFileSize(uri: Uri): Long {
