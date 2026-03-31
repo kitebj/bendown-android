@@ -3,7 +3,9 @@ package com.benben.bendown_android
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -111,30 +113,52 @@ class MainActivity : ComponentActivity() {
                     try {
                         openFileFromUri(uri)
                     } catch (e: Exception) {
+                        Toast.makeText(this, "打开文件失败: ${e.message}", Toast.LENGTH_SHORT).show()
                         selectedFile = null
                     }
                 }
             }
             Intent.ACTION_SEND -> {
-                val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+                val uri = getParcelableExtraCompat<Uri>(intent, Intent.EXTRA_STREAM)
                 uri?.let {
                     try {
                         openFileFromUri(it)
                     } catch (e: Exception) {
+                        Toast.makeText(this, "打开文件失败: ${e.message}", Toast.LENGTH_SHORT).show()
                         selectedFile = null
                     }
                 }
             }
             Intent.ACTION_SEND_MULTIPLE -> {
-                val uris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+                val uris = getParcelableArrayListExtraCompat<Uri>(intent, Intent.EXTRA_STREAM)
                 uris?.firstOrNull()?.let { uri ->
                     try {
                         openFileFromUri(uri)
                     } catch (e: Exception) {
+                        Toast.makeText(this, "打开文件失败: ${e.message}", Toast.LENGTH_SHORT).show()
                         selectedFile = null
                     }
                 }
             }
+        }
+    }
+
+    // 兼容新旧 API 的辅助方法
+    private inline fun <reified T : android.os.Parcelable> getParcelableExtraCompat(intent: Intent, name: String): T? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(name, T::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(name)
+        }
+    }
+
+    private inline fun <reified T : android.os.Parcelable> getParcelableArrayListExtraCompat(intent: Intent, name: String): ArrayList<T>? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableArrayListExtra(name, T::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableArrayListExtra(name)
         }
     }
 

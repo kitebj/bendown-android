@@ -9,16 +9,68 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.Color
+import java.util.Collections
+import java.util.LinkedHashMap
 
 /**
- * Markdown解析器
+ * Markdown 解析器
  */
 object MarkdownParser {
 
+    // 最大递归深度，防止栈溢出
+    private const val MAX_RECURSION_DEPTH = 10
+
+    // 解析结果缓存（线程安全的 LRU 缓存）
+    private const val MAX_CACHE_SIZE = 200
+    private val cache = Collections.synchronizedMap(object : LinkedHashMap<String, AnnotatedString>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AnnotatedString>?): Boolean {
+            return size > MAX_CACHE_SIZE
+        }
+    })
+
+    /**
+     * 清除缓存
+     */
+    fun clearCache() {
+        synchronized(cache) {
+            cache.clear()
+        }
+    }
+
     /**
      * 解析行内格式（粗体、斜体、代码、链接、删除线）
+     * @param text 要解析的文本
+     * @param depth 当前递归深度（内部使用）
      */
-    fun parseInlineFormatting(text: String): AnnotatedString {
+    fun parseInlineFormatting(text: String, depth: Int = 0): AnnotatedString {
+        // 超过最大深度，直接返回原文本
+        if (depth >= MAX_RECURSION_DEPTH) {
+            return buildAnnotatedString { append(text) }
+        }
+
+        // 只有顶层调用才使用缓存
+        if (depth == 0) {
+            synchronized(cache) {
+                cache[text]?.let { return it }
+            }
+        }
+
+        val result = parseInlineFormattingInternal(text, depth)
+
+        // 缓存结果
+        if (depth == 0) {
+            synchronized(cache) {
+                cache[text] = result
+            }
+        }
+
+        return result
+    }
+
+    /**
+     * 内部解析方法
+     */
+    private fun parseInlineFormattingInternal(text: String, depth: Int): AnnotatedString {
         return buildAnnotatedString {
             var i = 0
             while (i < text.length) {
@@ -31,7 +83,7 @@ object MarkdownParser {
                             withStyle(
                                 style = SpanStyle(textDecoration = TextDecoration.LineThrough)
                             ) {
-                                append(parseInlineFormatting(text.substring(i, end)))
+                                append(parseInlineFormatting(text.substring(i, end), depth + 1))
                             }
                             i = end + 2
                         } else {
@@ -49,7 +101,7 @@ object MarkdownParser {
                             if (urlEnd != -1) {
                                 val url = text.substring(urlStart, urlEnd)
 
-                                // 添加点击链接
+                                // 添加点击链接样式
                                 withStyle(
                                     style = SpanStyle(
                                         color = Color(0xFF1976D2),
@@ -85,7 +137,7 @@ object MarkdownParser {
                         val end = text.indexOf(delimiter, i)
                         if (end != -1) {
                             withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                                append(parseInlineFormatting(text.substring(i, end)))
+                                append(parseInlineFormatting(text.substring(i, end), depth + 1))
                             }
                             i = end + 2
                         } else {
@@ -100,7 +152,7 @@ object MarkdownParser {
                         val end = text.indexOf(delimiter, i)
                         if (end != -1) {
                             withStyle(style = SpanStyle(fontStyle = FontStyle.Italic)) {
-                                append(parseInlineFormatting(text.substring(i, end)))
+                                append(parseInlineFormatting(text.substring(i, end), depth + 1))
                             }
                             i = end + 2
                         } else {

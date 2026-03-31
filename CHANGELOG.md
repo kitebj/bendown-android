@@ -9,6 +9,20 @@
 
 ---
 
+## [0.2.6] - 2026-03-31
+
+### 修复
+- 🔒 **移除多余权限** - 删除 MANAGE_EXTERNAL_STORAGE 等权限，符合 SAF 方案设计
+- 🧹 **清理废弃代码** - 删除旧的 com.bendown.markdownreader 包
+- 🛡️ **递归深度限制** - MarkdownParser 添加最大递归深度，防止栈溢出
+- 📱 **API 兼容性** - 修复 getParcelableExtra 废弃 API，兼容 Android 14+
+- 💬 **错误反馈** - 打开文件失败时显示 Toast 提示
+
+### 优化
+- ⚡ **解析缓存** - MarkdownParser 添加 LRU 缓存，提升渲染性能
+
+---
+
 ## [0.2.5] - 2026-03-31
 
 ### 新增
