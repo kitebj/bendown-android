@@ -91,6 +91,37 @@ class RecentFilesManager(context: Context) {
     }
 
     /**
+     * 更新文件名和URI（用于重命名）
+     */
+    fun updateFileName(oldUriString: String, newFileName: String, newUriString: String) {
+        val list = getAll().toMutableList()
+        val index = list.indexOfFirst { it.uriString == oldUriString }
+
+        if (index >= 0) {
+            val old = list[index]
+            list[index] = old.copy(
+                fileName = newFileName,
+                uriString = newUriString
+            )
+            save(list)
+        }
+    }
+
+    /**
+     * 根据 URI 更新来源信息
+     */
+    fun updateSource(uriString: String, source: String) {
+        val list = getAll().toMutableList()
+        val index = list.indexOfFirst { it.uriString == uriString }
+
+        if (index >= 0) {
+            val old = list[index]
+            list[index] = old.copy(source = source)
+            save(list)
+        }
+    }
+
+    /**
      * 清空所有记录
      */
     fun clear() {

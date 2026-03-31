@@ -2,8 +2,14 @@ package com.benben.bendown_android.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,18 +20,31 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import com.benben.bendown_android.R
 import com.benben.bendown_android.data.model.RecentFile
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * 文件选择页面
@@ -37,12 +56,30 @@ fun FileListScreen(
     recentFiles: List<RecentFile> = emptyList(),
     onRecentFileClick: (RecentFile) -> Unit = {},
     onClearHistory: () -> Unit = {},
+    onShareFile: (RecentFile) -> Unit = {},
+    onRenameFile: (RecentFile, String) -> Unit = { _, _ -> },
+    onDeleteFile: (RecentFile) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+
+    // 长按菜单状态
+    var selectedItem by remember { mutableStateOf<RecentFile?>(null) }
+    var showItemMenu by remember { mutableStateOf(false) }
+    var menuPosition by remember { mutableStateOf(Offset.Zero) }
+
+    // 重命名弹窗状态
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf("") }
+    
+    // 获取屏幕尺寸
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val screenWidth = with(density) { view.width.toDp() }
+    val screenHeight = with(density) { view.height.toDp() }
 
     Scaffold(
         topBar = {
@@ -181,12 +218,163 @@ fun FileListScreen(
                     items(recentFiles) { recentFile ->
                         RecentFileItem(
                             recentFile = recentFile,
-                            onClick = { onRecentFileClick(recentFile) }
+                            onClick = { onRecentFileClick(recentFile) },
+                            onLongClick = { position ->
+                                selectedItem = recentFile
+                                menuPosition = position
+                                showItemMenu = true
+                            }
                         )
                     }
                 }
             }
         }
+    }
+
+    // 长按菜单
+    if (showItemMenu && selectedItem != null) {
+        val item = selectedItem!!
+        val isLocalFile = item.uriString.startsWith("file:")
+        
+        // 使用 Box 在触摸点位置放置菜单
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            showItemMenu = false
+                            selectedItem = null
+                        }
+                    )
+                }
+        ) {
+            AnimatedVisibility(
+                visible = showItemMenu,
+                enter = scaleIn(initialScale = 0.8f),
+                exit = scaleOut(targetScale = 0.8f)
+            ) {
+                val menuWidthPx = with(density) { 140.dp.roundToPx() }
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .offset {
+                            // menuPosition 已经是像素值
+                            // x: 菜单右边缘对齐触摸点左边一点，往左弹出
+                            // y: 菜单显示在触摸点下方
+                            IntOffset(
+                                x = (menuPosition.x - menuWidthPx + 20).toInt().coerceAtLeast(16),
+                                y = (menuPosition.y + 10).toInt()
+                            )
+                        }
+                        .width(140.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    shadowElevation = 4.dp,
+                    tonalElevation = 2.dp,
+                    color = Color.White
+                ) {
+                Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                    // 分享
+                    Text(
+                        text = "分享...",
+                        fontSize = 14.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showItemMenu = false
+                                onShareFile(item)
+                                selectedItem = null
+                            }
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
+                    )
+                    
+                    // 编辑名称（仅本地文件显示）
+                    if (isLocalFile) {
+                        Text(
+                            text = "重命名",
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showItemMenu = false
+                                    val nameWithoutExt = item.fileName.substringBeforeLast(".")
+                                    renameText = nameWithoutExt
+                                    selectedItem = item
+                                    showRenameDialog = true
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
+                        )
+                    }
+                    
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        thickness = 0.5.dp,
+                        color = Color(0xFFE0E0E0)
+                    )
+                    
+                    // 删除文件/移除记录
+                    Text(
+                        text = if (isLocalFile) "删除文件" else "移除记录",
+                        fontSize = 14.sp,
+                        color = Color(0xFFD32F2F),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showItemMenu = false
+                                onDeleteFile(item)
+                                selectedItem = null
+                            }
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
+                    )
+                }
+            }
+            }
+        }
+    }
+
+    // 重命名弹窗
+    if (showRenameDialog && selectedItem != null) {
+        val item = selectedItem!!
+        AlertDialog(
+            onDismissRequest = { 
+                showRenameDialog = false
+                selectedItem = null
+            },
+            title = { Text("编辑名称") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    placeholder = { Text("输入文件名") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val newName = renameText.trim()
+                        if (newName.isNotEmpty()) {
+                            onRenameFile(item, newName)
+                        }
+                        showRenameDialog = false
+                        selectedItem = null
+                    }
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showRenameDialog = false
+                        selectedItem = null
+                    }
+                ) {
+                    Text("取消")
+                }
+            }
+        )
     }
 
     // 清除确认对话框
@@ -226,12 +414,33 @@ fun FileListScreen(
 fun RecentFileItem(
     recentFile: RecentFile,
     onClick: () -> Unit,
+    onLongClick: (Offset) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // 获取 item 在屏幕上的位置
+    var itemPositionInRoot by remember { mutableStateOf(Offset.Zero) }
+    
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .onGloballyPositioned { coordinates ->
+                // 获取 item 左上角在屏幕上的位置
+                itemPositionInRoot = coordinates.positionInRoot()
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onLongPress = { tapOffset ->
+                        // tapOffset 是相对于 item 左上角的偏移
+                        // 计算触摸点在屏幕上的绝对位置
+                        val absolutePosition = Offset(
+                            itemPositionInRoot.x + tapOffset.x,
+                            itemPositionInRoot.y + tapOffset.y
+                        )
+                        onLongClick(absolutePosition)
+                    }
+                )
+            }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -252,9 +461,14 @@ fun RecentFileItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            // 大小和时间
+            // 大小、来源、时间
+            val infoText = if (recentFile.source.isNotBlank()) {
+                "${recentFile.getFormattedSize()} · ${recentFile.source} · ${formatTime(recentFile.lastOpenedTime)}"
+            } else {
+                "${recentFile.getFormattedSize()} · ${formatTime(recentFile.lastOpenedTime)}"
+            }
             Text(
-                text = "${recentFile.getFormattedSize()} · ${formatTime(recentFile.lastOpenedTime)}",
+                text = infoText,
                 fontSize = 11.sp,
                 color = Color.Gray,
                 maxLines = 1

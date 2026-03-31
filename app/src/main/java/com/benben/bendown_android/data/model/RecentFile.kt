@@ -12,7 +12,8 @@ data class RecentFile(
     val uriString: String,      // URI 字符串
     val fileSize: Long,         // 文件大小（字节）
     val lastOpenedTime: Long,   // 最后打开时间（时间戳）
-    val scrollPosition: Int = 0 // 阅读位置（百分比 0-100）
+    val scrollPosition: Int = 0, // 阅读位置（百分比 0-100）
+    val source: String = ""     // 来源（如"来自微信"、"来自分享"、"来自剪贴板"）
 ) {
     val uri: Uri
         get() = Uri.parse(uriString)
@@ -32,6 +33,7 @@ data class RecentFile(
             put("fileSize", fileSize)
             put("lastOpenedTime", lastOpenedTime)
             put("scrollPosition", scrollPosition)
+            put("source", source)
         }.toString()
     }
 
@@ -47,7 +49,8 @@ data class RecentFile(
                     uriString = obj.getString("uriString"),
                     fileSize = obj.getLong("fileSize"),
                     lastOpenedTime = obj.getLong("lastOpenedTime"),
-                    scrollPosition = if (obj.has("scrollPosition")) obj.getInt("scrollPosition") else 0
+                    scrollPosition = if (obj.has("scrollPosition")) obj.getInt("scrollPosition") else 0,
+                    source = if (obj.has("source")) obj.getString("source") else ""
                 )
             } catch (e: Exception) {
                 null
