@@ -41,6 +41,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.benben.bendown_android.R
 import com.benben.bendown_android.data.model.RecentFile
+import com.benben.bendown_android.ui.components.SettingsBottomSheet
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.max
@@ -59,12 +60,15 @@ fun FileListScreen(
     onShareFile: (RecentFile) -> Unit = {},
     onRenameFile: (RecentFile, String) -> Unit = { _, _ -> },
     onDeleteFile: (RecentFile) -> Unit = {},
+    isClipboardMonitorEnabled: Boolean = true,
+    onClipboardMonitorChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showMenu by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
 
     // 长按菜单状态
     var selectedItem by remember { mutableStateOf<RecentFile?>(null) }
@@ -139,7 +143,7 @@ fun FileListScreen(
                                 .fillMaxWidth()
                                 .clickable {
                                     showMenu = false
-                                    Toast.makeText(context, "功能开发中", Toast.LENGTH_SHORT).show()
+                                    showSettings = true
                                 }
                                 .padding(horizontal = 20.dp, vertical = 10.dp)
                         )
@@ -417,6 +421,15 @@ fun FileListScreen(
     // 关于弹窗
     if (showAboutDialog) {
         AboutDialog(onDismiss = { showAboutDialog = false })
+    }
+
+    // 设置抽屉
+    if (showSettings) {
+        SettingsBottomSheet(
+            isClipboardMonitorEnabled = isClipboardMonitorEnabled,
+            onClipboardMonitorChange = onClipboardMonitorChange,
+            onDismiss = { showSettings = false }
+        )
     }
 }
 

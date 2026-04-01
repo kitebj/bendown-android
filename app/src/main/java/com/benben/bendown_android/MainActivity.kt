@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var documentResolver: DocumentResolver
     private lateinit var recentFilesManager: RecentFilesManager
     private lateinit var clipboardHelper: ClipboardHelper
+    private lateinit var appSettingsManager: com.benben.bendown_android.data.AppSettingsManager
 
     // 文件选择器 Launcher
     private val filePickerLauncher = registerForActivityResult(
@@ -79,6 +80,9 @@ class MainActivity : ComponentActivity() {
     private var clipboardContent by mutableStateOf<String?>(null)
     private var clipboardFileName by mutableStateOf("")
 
+    // 剪贴板监控设置状态（用于 UI 重组）
+    private var isClipboardMonitorEnabledState by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -88,6 +92,10 @@ class MainActivity : ComponentActivity() {
         documentResolver = SimpleDocumentResolver(this)
         recentFilesManager = RecentFilesManager(this)
         clipboardHelper = ClipboardHelper(this)
+        appSettingsManager = com.benben.bendown_android.data.AppSettingsManager(this)
+
+        // 初始化剪贴板监控状态
+        isClipboardMonitorEnabledState = appSettingsManager.isClipboardMonitorEnabled
 
         // 加载历史记录
         loadRecentFiles()
@@ -101,6 +109,11 @@ class MainActivity : ComponentActivity() {
                     recentFiles = recentFiles,
                     clipboardContent = clipboardContent,
                     clipboardFileName = clipboardFileName,
+                    isClipboardMonitorEnabled = isClipboardMonitorEnabledState,
+                    onClipboardMonitorChange = { enabled ->
+                        isClipboardMonitorEnabledState = enabled
+                        appSettingsManager.isClipboardMonitorEnabled = enabled
+                    },
                     onOpenFilePicker = { openFilePicker() },
                     onRecentFileClick = { recentFile -> openRecentFile(recentFile) },
                     onClearHistory = {
@@ -153,6 +166,9 @@ class MainActivity : ComponentActivity() {
      * 检测剪贴板内容
      */
     private fun checkClipboard() {
+        // 检查设置是否启用
+        if (!appSettingsManager.isClipboardMonitorEnabled) return
+
         val text = clipboardHelper.getClipboardText()
         if (text.isNullOrBlank()) return
 
@@ -658,6 +674,8 @@ fun MarkdownReaderApp(
     recentFiles: List<RecentFile>,
     clipboardContent: String?,
     clipboardFileName: String,
+    isClipboardMonitorEnabled: Boolean,
+    onClipboardMonitorChange: (Boolean) -> Unit,
     onOpenFilePicker: () -> Unit,
     onRecentFileClick: (RecentFile) -> Unit,
     onClearHistory: () -> Unit,
@@ -680,7 +698,9 @@ fun MarkdownReaderApp(
                 onClearHistory = onClearHistory,
                 onShareFile = onShareFile,
                 onRenameFile = onRenameFile,
-                onDeleteFile = onDeleteFile
+                onDeleteFile = onDeleteFile,
+                isClipboardMonitorEnabled = isClipboardMonitorEnabled,
+                onClipboardMonitorChange = onClipboardMonitorChange
             )
 
             // 剪贴板保存提示弹窗
@@ -717,6 +737,8 @@ fun PreviewApp() {
             recentFiles = emptyList(),
             clipboardContent = null,
             clipboardFileName = "",
+            isClipboardMonitorEnabled = true,
+            onClipboardMonitorChange = {},
             onOpenFilePicker = {},
             onRecentFileClick = {},
             onClearHistory = {},
