@@ -13,12 +13,15 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -40,6 +43,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.benben.bendown_android.R
+import com.benben.bendown_android.data.model.FavoriteFile
 import com.benben.bendown_android.data.model.RecentFile
 import com.benben.bendown_android.ui.components.SettingsBottomSheet
 import java.text.SimpleDateFormat
@@ -55,11 +59,16 @@ import kotlin.math.min
 fun FileListScreen(
     onOpenFilePicker: () -> Unit,
     recentFiles: List<RecentFile> = emptyList(),
+    favoriteFiles: List<FavoriteFile> = emptyList(),
     onRecentFileClick: (RecentFile) -> Unit = {},
+    onFavoriteFileClick: (FavoriteFile) -> Unit = {},
     onClearHistory: () -> Unit = {},
     onShareFile: (RecentFile) -> Unit = {},
     onRenameFile: (RecentFile, String) -> Unit = { _, _ -> },
     onDeleteFile: (RecentFile) -> Unit = {},
+    onAddFavorite: (RecentFile) -> Unit = {},
+    onRemoveFavorite: (String) -> Unit = {},
+    isFavoriteCheck: (String) -> Boolean = { false },
     isClipboardMonitorEnabled: Boolean = true,
     onClipboardMonitorChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
@@ -70,8 +79,8 @@ fun FileListScreen(
     var showAboutDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
 
-    // 长按菜单状态
-    var selectedItem by remember { mutableStateOf<RecentFile?>(null) }
+    // 长按菜单状态（支持 RecentFile 和 FavoriteFile）
+    var selectedItem by remember { mutableStateOf<Any?>(null) }
     var showItemMenu by remember { mutableStateOf(false) }
     var menuPosition by remember { mutableStateOf(Offset.Zero) }
 
@@ -84,6 +93,10 @@ fun FileListScreen(
     val density = LocalDensity.current
     val screenWidth = with(density) { view.width.toDp() }
     val screenHeight = with(density) { view.height.toDp() }
+
+    // Tab 状态（只有当收藏大于0时才显示）
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -169,8 +182,8 @@ fun FileListScreen(
                 .padding(paddingValues)
                 .background(Color.White)
         ) {
-            if (recentFiles.isEmpty()) {
-                // 无历史记录：居中显示图标、欢迎语和按钮
+            if (recentFiles.isEmpty() && favoriteFiles.isEmpty()) {
+                // 无历史记录且无收藏：居中显示图标、欢迎语和按钮
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -217,8 +230,73 @@ fun FileListScreen(
                         }
                     }
                 }
+            } else if (favoriteFiles.isNotEmpty()) {
+                // 有收藏时：显示 Tab
+                TabRow(
+                    selectedTabIndex = pagerState.currentPage,
+                    containerColor = Color.White,
+                    contentColor = Color(0xFF1976D2)
+                ) {
+                    Tab(
+                        selected = pagerState.currentPage == 0,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
+                        text = { Text("最近打开") }
+                    )
+                    Tab(
+                        selected = pagerState.currentPage == 1,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
+                        text = { Text("收藏文章") }
+                    )
+                }
+
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.weight(1f)
+                ) { page ->
+                    when (page) {
+                        0 -> {
+                            // 最近打开页面
+                            if (recentFiles.isNotEmpty()) {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(recentFiles) { recentFile ->
+                                        RecentFileItem(
+                                            recentFile = recentFile,
+                                            isFavorite = isFavoriteCheck(recentFile.uriString),
+                                            onClick = { onRecentFileClick(recentFile) },
+                                            onLongClick = { position ->
+                                                selectedItem = recentFile
+                                                menuPosition = position
+                                                showItemMenu = true
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        1 -> {
+                            // 收藏文章页面
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(favoriteFiles) { favoriteFile ->
+                                    FavoriteFileItem(
+                                        favoriteFile = favoriteFile,
+                                        onClick = { onFavoriteFileClick(favoriteFile) },
+                                        onLongClick = { position ->
+                                            selectedItem = favoriteFile
+                                            menuPosition = position
+                                            showItemMenu = true
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             } else {
-                // 有历史记录：只显示历史列表
+                // 只有历史记录，没有收藏：只显示历史列表
                 Text(
                     text = "最近打开",
                     fontSize = 13.sp,
@@ -235,6 +313,7 @@ fun FileListScreen(
                     items(recentFiles) { recentFile ->
                         RecentFileItem(
                             recentFile = recentFile,
+                            isFavorite = isFavoriteCheck(recentFile.uriString),
                             onClick = { onRecentFileClick(recentFile) },
                             onLongClick = { position ->
                                 selectedItem = recentFile
@@ -248,11 +327,31 @@ fun FileListScreen(
         }
     }
 
-    // 长按菜单
+    // 长按菜单（支持 RecentFile 和 FavoriteFile）
     if (showItemMenu && selectedItem != null) {
         val item = selectedItem!!
-        val isLocalFile = item.uriString.startsWith("file:")
-        
+        var uriString = ""
+        var fileName = ""
+        var isRecentFile = false
+        var isFavoriteFileItem = false
+        var isFavorite = false
+
+        when (item) {
+            is RecentFile -> {
+                uriString = item.uriString
+                fileName = item.fileName
+                isRecentFile = true
+                isFavorite = isFavoriteCheck(item.uriString)
+            }
+            is FavoriteFile -> {
+                uriString = item.uriString
+                fileName = item.fileName
+                isFavoriteFileItem = true
+                isFavorite = true
+            }
+        }
+        val isLocalFile = uriString.startsWith("file:")
+
         // 使用 Box 在触摸点位置放置菜单
         Box(
             modifier = Modifier
@@ -271,7 +370,7 @@ fun FileListScreen(
                 enter = scaleIn(initialScale = 0.8f),
                 exit = scaleOut(targetScale = 0.8f)
             ) {
-                val menuWidthPx = with(density) { 140.dp.roundToPx() }
+                val menuWidthPx = with(density) { 160.dp.roundToPx() }
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -284,7 +383,7 @@ fun FileListScreen(
                                 y = (menuPosition.y + 10).toInt()
                             )
                         }
-                        .width(140.dp),
+                        .width(160.dp),
                     shape = RoundedCornerShape(12.dp),
                     shadowElevation = 4.dp,
                     tonalElevation = 2.dp,
@@ -299,12 +398,12 @@ fun FileListScreen(
                             .fillMaxWidth()
                             .clickable {
                                 showItemMenu = false
-                                onShareFile(item)
+                                onShareFile(item as RecentFile)
                                 selectedItem = null
                             }
                             .padding(horizontal = 20.dp, vertical = 10.dp)
                     )
-                    
+
                     // 编辑名称（仅本地文件显示）
                     if (isLocalFile) {
                         Text(
@@ -314,7 +413,7 @@ fun FileListScreen(
                                 .fillMaxWidth()
                                 .clickable {
                                     showItemMenu = false
-                                    val nameWithoutExt = item.fileName.substringBeforeLast(".")
+                                    val nameWithoutExt = fileName.substringBeforeLast(".")
                                     renameText = nameWithoutExt
                                     selectedItem = item
                                     showRenameDialog = true
@@ -322,13 +421,49 @@ fun FileListScreen(
                                 .padding(horizontal = 20.dp, vertical = 10.dp)
                         )
                     }
-                    
+
+                    // 收藏/取消收藏（仅历史记录显示）
+                    if (isRecentFile) {
+                        Text(
+                            text = if (isFavorite) "取消收藏" else "加入收藏",
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showItemMenu = false
+                                    if (isFavorite) {
+                                        onRemoveFavorite(uriString)
+                                    } else {
+                                        onAddFavorite(item as RecentFile)
+                                    }
+                                    selectedItem = null
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
+                        )
+                    }
+
+                    // 取消收藏（仅收藏夹显示）
+                    if (isFavoriteFileItem) {
+                        Text(
+                            text = "取消收藏",
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showItemMenu = false
+                                    onRemoveFavorite(uriString)
+                                    selectedItem = null
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
+                        )
+                    }
+
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         thickness = 0.5.dp,
                         color = Color(0xFFE0E0E0)
                     )
-                    
+
                     // 删除文件/移除记录
                     Text(
                         text = if (isLocalFile) "删除文件" else "移除记录",
@@ -338,7 +473,7 @@ fun FileListScreen(
                             .fillMaxWidth()
                             .clickable {
                                 showItemMenu = false
-                                onDeleteFile(item)
+                                onDeleteFile(item as RecentFile)
                                 selectedItem = null
                             }
                             .padding(horizontal = 20.dp, vertical = 10.dp)
@@ -371,7 +506,7 @@ fun FileListScreen(
                 TextButton(
                     onClick = {
                         val newName = renameText.trim()
-                        if (newName.isNotEmpty()) {
+                        if (newName.isNotEmpty() && item is RecentFile) {
                             onRenameFile(item, newName)
                         }
                         showRenameDialog = false
@@ -434,18 +569,19 @@ fun FileListScreen(
 }
 
 /**
- * 历史文件列表项（紧凑布局）
+ * 历史文件列表项（紧凑布局，带收藏标志）
  */
 @Composable
 fun RecentFileItem(
     recentFile: RecentFile,
+    isFavorite: Boolean = false,
     onClick: () -> Unit,
     onLongClick: (Offset) -> Unit,
     modifier: Modifier = Modifier
 ) {
     // 获取 item 在屏幕上的位置
     var itemPositionInRoot by remember { mutableStateOf(Offset.Zero) }
-    
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -500,6 +636,92 @@ fun RecentFileItem(
                 maxLines = 1
             )
         }
+
+        // 收藏标志
+        if (isFavorite) {
+            Text(
+                text = "⭐",
+                fontSize = 18.sp,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+    }
+}
+
+/**
+ * 收藏文件列表项
+ */
+@Composable
+fun FavoriteFileItem(
+    favoriteFile: FavoriteFile,
+    onClick: () -> Unit,
+    onLongClick: (Offset) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // 获取 item 在屏幕上的位置
+    var itemPositionInRoot by remember { mutableStateOf(Offset.Zero) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { coordinates ->
+                // 获取 item 左上角在屏幕上的位置
+                itemPositionInRoot = coordinates.positionInRoot()
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onLongPress = { tapOffset ->
+                        // tapOffset 是相对于 item 左上角的偏移
+                        // 计算触摸点在屏幕上的绝对位置
+                        val absolutePosition = Offset(
+                            itemPositionInRoot.x + tapOffset.x,
+                            itemPositionInRoot.y + tapOffset.y
+                        )
+                        onLongClick(absolutePosition)
+                    }
+                )
+            }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 文件图标
+        Text(
+            text = "📄",
+            fontSize = 18.sp,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+
+        // 文件信息
+        Column(modifier = Modifier.weight(1f)) {
+            // 文件名
+            Text(
+                text = favoriteFile.fileName,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            // 大小、来源、时间
+            val infoText = if (favoriteFile.source.isNotBlank()) {
+                "${favoriteFile.getFormattedSize()} · ${favoriteFile.source} · ${formatTime(favoriteFile.favoriteTime)}"
+            } else {
+                "${favoriteFile.getFormattedSize()} · ${formatTime(favoriteFile.favoriteTime)}"
+            }
+            Text(
+                text = infoText,
+                fontSize = 11.sp,
+                color = Color.Gray,
+                maxLines = 1
+            )
+        }
+
+        // 收藏标志
+        Text(
+            text = "⭐",
+            fontSize = 18.sp,
+            modifier = Modifier.padding(start = 8.dp)
+        )
     }
 
     // 分隔线

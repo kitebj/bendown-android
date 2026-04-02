@@ -40,7 +40,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.benben.bendown_android.data.ClipboardHelper
+import com.benben.bendown_android.data.FavoritesManager
 import com.benben.bendown_android.data.RecentFilesManager
+import com.benben.bendown_android.data.model.FavoriteFile
 import com.benben.bendown_android.data.model.MarkdownFile
 import com.benben.bendown_android.data.model.RecentFile
 import com.benben.bendown_android.data.resolver.DocumentResolver
@@ -53,8 +55,15 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var documentResolver: DocumentResolver
     private lateinit var recentFilesManager: RecentFilesManager
+    private lateinit var favoritesManager: FavoritesManager
     private lateinit var clipboardHelper: ClipboardHelper
     private lateinit var appSettingsManager: com.benben.bendown_android.data.AppSettingsManager
+
+    // 历史记录列表（显示用）
+    private var recentFiles by mutableStateOf<List<RecentFile>>(emptyList())
+
+    // 收藏文件列表（显示用）
+    private var favoriteFiles by mutableStateOf<List<FavoriteFile>>(emptyList())
 
     // 文件选择器 Launcher
     private val filePickerLauncher = registerForActivityResult(
@@ -73,9 +82,6 @@ class MainActivity : ComponentActivity() {
     // 当前文件的初始滚动位置
     private var initialScrollPosition by mutableStateOf(0)
 
-    // 历史记录列表（显示用）
-    private var recentFiles by mutableStateOf<List<RecentFile>>(emptyList())
-
     // 剪贴板内容（用于弹窗显示）
     private var clipboardContent by mutableStateOf<String?>(null)
     private var clipboardFileName by mutableStateOf("")
@@ -91,14 +97,16 @@ class MainActivity : ComponentActivity() {
 
         documentResolver = SimpleDocumentResolver(this)
         recentFilesManager = RecentFilesManager(this)
+        favoritesManager = FavoritesManager(this)
         clipboardHelper = ClipboardHelper(this)
         appSettingsManager = com.benben.bendown_android.data.AppSettingsManager(this)
 
         // 初始化剪贴板监控状态
         isClipboardMonitorEnabledState = appSettingsManager.isClipboardMonitorEnabled
 
-        // 加载历史记录
+        // 加载历史记录和收藏
         loadRecentFiles()
+        loadFavoriteFiles()
 
         setContent {
             MaterialTheme {
@@ -107,6 +115,7 @@ class MainActivity : ComponentActivity() {
                     selectedFile = selectedFile,
                     initialScrollPosition = initialScrollPosition,
                     recentFiles = recentFiles,
+                    favoriteFiles = favoriteFiles,
                     clipboardContent = clipboardContent,
                     clipboardFileName = clipboardFileName,
                     isClipboardMonitorEnabled = isClipboardMonitorEnabledState,
@@ -116,6 +125,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onOpenFilePicker = { openFilePicker() },
                     onRecentFileClick = { recentFile -> openRecentFile(recentFile) },
+                    onFavoriteFileClick = { openFavoriteFile(it) },
                     onClearHistory = {
                         recentFilesManager.clear()
                         loadRecentFiles()
@@ -127,12 +137,18 @@ class MainActivity : ComponentActivity() {
                         selectedFile = null
                         initialScrollPosition = 0
                         loadRecentFiles()
+                        loadFavoriteFiles()
                     },
                     onSaveClipboard = { saveClipboardContent() },
                     onDismissClipboard = { dismissClipboardDialog() },
                     onShareFile = { shareFile(it) },
                     onRenameFile = { recentFile, newName -> renameFile(recentFile, newName) },
-                    onDeleteFile = { deleteFileOrRemoveRecord(it) }
+                    onDeleteFile = { deleteFileOrRemoveRecord(it) },
+                    onAddFavorite = { addFavorite(it) },
+                    onRemoveFavorite = { removeFavorite(it) },
+                    isFavoriteCheck = { uriString ->
+                        favoriteFiles.any { it.uriString == uriString }
+                    }
                 )
             }
         }
@@ -332,10 +348,32 @@ class MainActivity : ComponentActivity() {
         recentFiles = recentFilesManager.getDisplayList()
     }
 
+    private fun loadFavoriteFiles() {
+        favoriteFiles = favoritesManager.getAll()
+    }
+
+    private fun addFavorite(recentFile: RecentFile) {
+        favoritesManager.addFromRecent(recentFile)
+        loadFavoriteFiles()
+    }
+
+    private fun removeFavorite(uriString: String) {
+        favoritesManager.remove(uriString)
+        loadFavoriteFiles()
+    }
+
+    private fun isFavorite(uriString: String): Boolean {
+        return favoritesManager.isFavorite(uriString)
+    }
+
     private fun openRecentFile(recentFile: RecentFile) {
         // 恢复滚动位置
         initialScrollPosition = recentFile.scrollPosition
         openFileFromUri(recentFile.uri, recentFile.source)
+    }
+
+    private fun openFavoriteFile(favoriteFile: FavoriteFile) {
+        openFileFromUri(favoriteFile.uri, favoriteFile.source)
     }
 
     /**
@@ -512,27 +550,53 @@ class MainActivity : ComponentActivity() {
         var fileSize = 0L
         
         if (uri.scheme == "content") {
-            // 检查是否已有本地副本
+            // 检查是否已有本地副本（通过历史记录、收藏列表、或文件名）
             val existingRecord = recentFilesManager.getByUri(uri.toString())
-            val localUriString = existingRecord?.uriString?.takeIf { it.startsWith("file:") }
-            
+            var localUriString = existingRecord?.uriString?.takeIf { it.startsWith("file:") }
+
+            // 如果历史记录没找到，再查收藏列表
+            if (localUriString == null) {
+                val allFavorites = favoritesManager.getAll()
+                // 先尝试精确匹配
+                val favoriteRecord = allFavorites.find { it.uriString == uri.toString() }
+                if (favoriteRecord != null && favoriteRecord.uriString.startsWith("file:")) {
+                    localUriString = favoriteRecord.uriString
+                }
+            }
+
+            // 如果还没找到，检查本地文件是否已存在（通过文件名）
+            if (localUriString == null) {
+                val localFile = File(filesDir, fileName)
+                if (localFile.exists()) {
+                    localUriString = Uri.fromFile(localFile).toString()
+                }
+            }
+
             if (localUriString != null) {
                 // 已有本地副本，直接使用
                 finalUri = Uri.parse(localUriString)
                 val localFile = File(finalUri.path ?: "")
                 if (localFile.exists()) {
                     fileSize = localFile.length()
-                    finalSource = existingRecord.source
+                    finalSource = existingRecord?.source ?: source
+                } else {
+                    // 本地文件不存在，需要重新保存
+                    localUriString = null
                 }
-            } else {
+            }
+
+            if (localUriString == null) {
                 // 尝试保存到本地
                 try {
-                    val savedFile = saveExternalToLocal(uri, fileName)
-                    if (savedFile != null) {
+                    val result = saveExternalToLocal(uri, fileName)
+                    if (result != null) {
+                        val (savedFile, isNewSave) = result
                         finalUri = Uri.fromFile(savedFile)
                         fileSize = savedFile.length()
-                        // 保存成功，提示用户
-                        Toast.makeText(this, "已保存到本地：$fileName", Toast.LENGTH_SHORT).show()
+                        // 只有新保存时才提示用户
+                        if (isNewSave) {
+                            Toast.makeText(this, "已保存到本地：$fileName", Toast.LENGTH_SHORT).show()
+                        }
                     } else {
                         // 保存失败，使用原URI
                         fileSize = getFileSize(uri)
@@ -580,30 +644,31 @@ class MainActivity : ComponentActivity() {
 
     /**
      * 将外部文件保存到本地
+     * 返回 Pair<文件, 是否新保存>
      * 如果同名文件已存在：
-     * - 内容相同：跳过，返回现有文件
-     * - 内容不同：加数字后缀保存
+     * - 内容相同：跳过，返回现有文件 + false
+     * - 内容不同：加数字后缀保存，返回新文件 + true
      */
-    private fun saveExternalToLocal(uri: Uri, fileName: String): File? {
+    private fun saveExternalToLocal(uri: Uri, fileName: String): Pair<File, Boolean>? {
         return try {
             // 读取内容
             val inputStream = contentResolver.openInputStream(uri) ?: return null
             val content = inputStream.bufferedReader().readText()
             inputStream.close()
-            
+
             // 检查文件大小（最大10MB）
             if (content.length > 10 * 1024 * 1024) {
                 return null
             }
-            
+
             // 检查同名文件是否存在
             var localFile = File(filesDir, fileName)
             if (localFile.exists()) {
                 // 比较内容
                 val existingContent = localFile.readText()
                 if (existingContent == content) {
-                    // 内容相同，直接返回现有文件
-                    return localFile
+                    // 内容相同，直接返回现有文件（不是新保存）
+                    return Pair(localFile, false)
                 }
                 // 内容不同，找一个新的文件名
                 val baseName = fileName.substringBeforeLast(".")
@@ -619,10 +684,10 @@ class MainActivity : ComponentActivity() {
                     index++
                 }
             }
-            
+
             // 保存到本地
             localFile.writeText(content)
-            localFile
+            Pair(localFile, true)
         } catch (e: Exception) {
             null
         }
@@ -672,12 +737,14 @@ fun MarkdownReaderApp(
     selectedFile: MarkdownFile?,
     initialScrollPosition: Int,
     recentFiles: List<RecentFile>,
+    favoriteFiles: List<FavoriteFile>,
     clipboardContent: String?,
     clipboardFileName: String,
     isClipboardMonitorEnabled: Boolean,
     onClipboardMonitorChange: (Boolean) -> Unit,
     onOpenFilePicker: () -> Unit,
     onRecentFileClick: (RecentFile) -> Unit,
+    onFavoriteFileClick: (FavoriteFile) -> Unit,
     onClearHistory: () -> Unit,
     onScrollPositionChange: (String, Int) -> Unit,
     onBack: () -> Unit,
@@ -685,7 +752,10 @@ fun MarkdownReaderApp(
     onDismissClipboard: () -> Unit,
     onShareFile: (RecentFile) -> Unit,
     onRenameFile: (RecentFile, String) -> Unit,
-    onDeleteFile: (RecentFile) -> Unit
+    onDeleteFile: (RecentFile) -> Unit,
+    onAddFavorite: (RecentFile) -> Unit,
+    onRemoveFavorite: (String) -> Unit,
+    isFavoriteCheck: (String) -> Boolean
 ) {
     val context = LocalContext.current
 
@@ -694,11 +764,16 @@ fun MarkdownReaderApp(
             FileListScreen(
                 onOpenFilePicker = onOpenFilePicker,
                 recentFiles = recentFiles,
+                favoriteFiles = favoriteFiles,
                 onRecentFileClick = onRecentFileClick,
+                onFavoriteFileClick = onFavoriteFileClick,
                 onClearHistory = onClearHistory,
                 onShareFile = onShareFile,
                 onRenameFile = onRenameFile,
                 onDeleteFile = onDeleteFile,
+                onAddFavorite = onAddFavorite,
+                onRemoveFavorite = onRemoveFavorite,
+                isFavoriteCheck = isFavoriteCheck,
                 isClipboardMonitorEnabled = isClipboardMonitorEnabled,
                 onClipboardMonitorChange = onClipboardMonitorChange
             )
@@ -714,13 +789,27 @@ fun MarkdownReaderApp(
             }
         }
     } else {
+        // 计算当前文件是否已收藏
+        val currentUriString = selectedFile.uri?.toString() ?: ""
+        val isCurrentFavorite = isFavoriteCheck(currentUriString)
+
         MarkdownViewerScreen(
             file = selectedFile,
             documentResolver = documentResolver,
             context = context,
             initialScrollPosition = initialScrollPosition,
             onBack = onBack,
-            onScrollPositionChange = onScrollPositionChange
+            onScrollPositionChange = onScrollPositionChange,
+            isFavorite = isCurrentFavorite,
+            onAddFavorite = {
+                // 从历史记录中找对应的 RecentFile 来添加收藏
+                recentFiles.find { it.uriString == currentUriString }?.let {
+                    onAddFavorite(it)
+                }
+            },
+            onRemoveFavorite = {
+                onRemoveFavorite(currentUriString)
+            }
         )
     }
 }
@@ -735,12 +824,14 @@ fun PreviewApp() {
             selectedFile = null,
             initialScrollPosition = 0,
             recentFiles = emptyList(),
+            favoriteFiles = emptyList(),
             clipboardContent = null,
             clipboardFileName = "",
             isClipboardMonitorEnabled = true,
             onClipboardMonitorChange = {},
             onOpenFilePicker = {},
             onRecentFileClick = {},
+            onFavoriteFileClick = {},
             onClearHistory = {},
             onScrollPositionChange = { _, _ -> },
             onBack = {},
@@ -748,7 +839,10 @@ fun PreviewApp() {
             onDismissClipboard = {},
             onShareFile = {},
             onRenameFile = { _, _ -> },
-            onDeleteFile = {}
+            onDeleteFile = {},
+            onAddFavorite = {},
+            onRemoveFavorite = {},
+            isFavoriteCheck = { false }
         )
     }
 }

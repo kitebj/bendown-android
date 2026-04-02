@@ -86,6 +86,9 @@ fun MarkdownViewerScreen(
     initialScrollPosition: Int = 0,
     onBack: () -> Unit,
     onScrollPositionChange: (String, Int) -> Unit = { _, _ -> },
+    isFavorite: Boolean = false,
+    onAddFavorite: () -> Unit = {},
+    onRemoveFavorite: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var fileContent by remember { mutableStateOf<String?>(null) }
@@ -189,16 +192,26 @@ fun MarkdownViewerScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        file.displayName,
-                        fontSize = 16.sp,
-                        maxLines = 1,
-                        modifier = Modifier.pointerInput(Unit) {
-                            detectTapGestures(
-                                onDoubleTap = { scrollToTop() }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            file.displayName,
+                            fontSize = 16.sp,
+                            maxLines = 1,
+                            modifier = Modifier.pointerInput(Unit) {
+                                detectTapGestures(
+                                    onDoubleTap = { scrollToTop() }
+                                )
+                            }
+                        )
+                        // 收藏标志
+                        if (isFavorite) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "⭐",
+                                fontSize = 18.sp
                             )
                         }
-                    )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -230,6 +243,21 @@ fun MarkdownViewerScreen(
                                 .clickable {
                                     showMenu = false
                                     shareFile()
+                                }
+                                .padding(horizontal = 20.dp, vertical = 10.dp)
+                        )
+                        Text(
+                            text = if (isFavorite) "取消收藏" else "加入收藏",
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showMenu = false
+                                    if (isFavorite) {
+                                        onRemoveFavorite()
+                                    } else {
+                                        onAddFavorite()
+                                    }
                                 }
                                 .padding(horizontal = 20.dp, vertical = 10.dp)
                         )
